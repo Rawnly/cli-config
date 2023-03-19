@@ -40,20 +40,20 @@ pub fn locate_config(prefix: &str, filename: &str) -> Option<PathBuf> {
             xdg::BaseDirectories::new()
                 .ok()
                 // Search for case n. 2
-                .and_then(|fallback| fallback.find_config_file(&format!("{prefix}.json")))
+                .and_then(|fallback| fallback.find_config_file(format!("{prefix}.json")))
         })
         .or_else(|| {
             if let Some(home_path) = home_dir() {
                 // Search for case n. 3 ($HOME/.config/{prefix}/{filename})
                 let fallback_path = format!(".config/{prefix}");
-                let fallback = home_path.join(&fallback_path).join(filename);
+                let fallback = home_path.join(fallback_path).join(filename);
 
                 if fallback.exists() {
                     return Some(fallback);
                 }
 
                 // Search for case n. 4 ($HOME/.{prefix})
-                let fallback = home_path.join(&format!(".{prefix}.json"));
+                let fallback = home_path.join(format!(".{prefix}.json"));
 
                 if fallback.exists() {
                     return Some(fallback);
@@ -115,13 +115,13 @@ where
     match config_path {
         None => {
             match get_new_config_path(prefix, filename) {
-                None => return Err(crate::error::Error::Custom("Could not create file")),
+                None => Err(crate::error::Error::Custom("Could not create file")),
                 Some(path) => {
                     config.write(&path)?;
-                    return Ok(path);
+                    Ok(path)
                 }
-            };
+            }
         }
-        Some(path) => return Ok(path),
+        Some(path) => Ok(path),
     }
 }
