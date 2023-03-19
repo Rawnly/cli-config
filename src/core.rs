@@ -113,15 +113,13 @@ where
     let config_path = locate_config(prefix, filename);
 
     match config_path {
-        None => {
-            match get_new_config_path(prefix, filename) {
-                None => Err(crate::error::Error::Custom("Could not create file")),
-                Some(path) => {
-                    config.write(&path)?;
-                    Ok(path)
-                }
+        None => match get_new_config_path(prefix, filename) {
+            None => Err(crate::error::Error::Custom("Could not create file")),
+            Some(path) => {
+                config.write(&path)?;
+                Ok(path)
             }
-        }
+        },
         Some(path) => Ok(path),
     }
 }
