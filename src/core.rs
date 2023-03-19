@@ -8,7 +8,7 @@ use crate::fs::File;
 ///
 /// - `prefix` is the name of the folder that will contain the config file
 #[cfg(not(windows))]
-pub fn get_new_path(prefix: &str, filename: &str) -> Option<PathBuf> {
+fn get_new_config_path(prefix: &str, filename: &str) -> Option<PathBuf> {
     xdg::BaseDirectories::with_prefix(prefix)
         .ok()
         .and_then(|base| base.place_config_file(filename).ok())
@@ -18,10 +18,10 @@ pub fn get_new_path(prefix: &str, filename: &str) -> Option<PathBuf> {
 ///
 /// - `prefix` is the name of the folder that will contain the config file
 #[cfg(windows)]
-pub fn get_new_path(prefix: &str, filename: &str) -> Option<PathBuf> {
+fn get_new_config_path(prefix: &str, filename: &str) -> Option<PathBuf> {
     dirs::config_dir()
         .map(|p| p.join(&format!("{}\\{}", prefix, filename)))
-        .filter(|p| p.exists())
+        .find(|p| p.exists())
 }
 
 /// Try to find the location of the first config file in the following paths:
@@ -31,7 +31,7 @@ pub fn get_new_path(prefix: &str, filename: &str) -> Option<PathBuf> {
 /// 3. $HOME/.config/{prefix}/{filename}
 /// 4. $HOME/.{prefix}
 #[cfg(not(windows))]
-pub fn find(prefix: &str, filename: &str) -> Option<PathBuf> {
+pub fn locate_config(prefix: &str, filename: &str) -> Option<PathBuf> {
     xdg::BaseDirectories::with_prefix(prefix)
         .ok()
         // Search for case n. 1
@@ -66,24 +66,55 @@ pub fn find(prefix: &str, filename: &str) -> Option<PathBuf> {
 
 /// Get the location of the config file on windows
 #[cfg(windows)]
-pub fn find(prefix: &str, filename: &str) -> Option<PathBuf> {
+pub fn locate_config(prefix: &str, filename: &str) -> Option<PathBuf> {
     dirs::config_dir()
         .map(|p| p.join(&format!("{}\\{}", prefix, filename)))
         .filter(|p| p.exists())
 }
 
-/// Returns the config path
-/// the file is created if doesn't exist
-#[cfg(not(windows))]
-pub fn try_get_path<T>(config: T, prefix: &str, filename: &str) -> crate::Result<PathBuf>
+/// Initialize the configuration file for the specified type.
+///
+/// This function returns the path to the configuration file for the specified type. If the file does not exist, it will be created.
+///
+/// # Arguments
+///
+/// * `config` - The configuration object to initialize the file with.
+/// * `prefix` - The name of the folder that will contain the configuration file.
+/// * `filename` - The name of the configuration file.
+///
+///
+/// # Examples
+///
+/// ```
+/// use cli_config::fs::JSONFile;
+///
+/// #[derive(serde::Serialize, serde::Deserialize, Default)]
+/// struct MyConfig {
+///     pub is_first_run: bool,
+/// }
+///
+/// impl JSONFile for MyConfig {}
+///
+/// let config = MyConfig::default();
+/// let prefix = "my-app";
+/// let filename = "config.json";
+///
+/// // Initialize the configuration file
+/// let config_path = cli_config::init(config, prefix, filename).unwrap();
+///
+/// // Use the configuration file
+/// let loaded_config = MyConfig::load(&config_path).unwrap();
+/// println!("Is my first run? {}", loaded_config.is_first_run);
+/// ```
+pub fn init<T>(config: T, prefix: &str, filename: &str) -> crate::Result<PathBuf>
 where
     T: serde::Serialize + Default + File,
 {
-    let config_path = find(prefix, filename);
+    let config_path = locate_config(prefix, filename);
 
     match config_path {
         None => {
-            match get_new_path(prefix, filename) {
+            match get_new_config_path(prefix, filename) {
                 None => return Err(crate::error::Error::Custom("Could not create file")),
                 Some(path) => {
                     config.write(&path)?;

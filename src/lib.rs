@@ -1,7 +1,8 @@
 #[deny(missing_docs)]
 
 /// Core Module
-pub mod config;
+mod core;
+pub use crate::core::*;
 
 /// Errors
 pub mod error;

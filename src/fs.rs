@@ -2,38 +2,6 @@
   This module contains file utilities
   The following traits should be used to ease
   read/write operation in the fs.
-
-  ## Example
-  ```rust
-    use cli_config::fs::*;
-    use cli_config::config;
-    use cli_config::error::Error;
-
-    #[derive(Debug, Default, serde::Deserialize, serde::Serialize)]
-    struct MyConfig {
-      is_first_install: bool
-    }
-
-    impl JSONFile for MyConfig {}
-
-    fn main() -> cli_config::Result<()> {
-      let mut config_path = config::get_path("hawk", "config.json")?;
-
-      if let None = config_path {
-        config_path = config::get_new_path("hawk", "config.json");
-
-        match config::get_new_path("hawk", "config.json") {
-            None => return Err(Error::Custom("Could not create config file.")),
-            Some(config_path) => {
-              Config::default().write(config_path.unwrap().as_path())?;
-            }
-        }
-      }
-
-
-      Ok(())
-    }
-  ```
 */
 
 /// Generic trait
@@ -48,9 +16,9 @@ pub trait File {
 #[cfg(any(feature = "json", feature = "toml", feature = "yaml"))]
 use serde::de::DeserializeOwned;
 
-use std::path::Path;
 #[cfg(any(feature = "json", feature = "toml", feature = "yaml"))]
-use std::{fs, path::Path};
+use std::fs;
+use std::path::Path;
 
 #[cfg(feature = "toml")]
 use std::io::Write;
@@ -107,7 +75,7 @@ where
     fn load(path: &Path) -> crate::Result<Self> {
         let file = fs::read_to_string(path)?;
 
-        toml::from_str(&file).map_err(error::Error::TOML)
+        toml::from_str(&file).map_err(Error::TOML)
     }
 
     /// Write `Self` into specified file
@@ -118,5 +86,92 @@ where
         file.write_all(&str.as_bytes())?;
 
         Ok(())
+    }
+}
+
+mod test_utils {
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Debug, PartialEq, Serialize, Deserialize)]
+    pub struct TestConfig {
+        pub foo: String,
+        pub bar: bool,
+        pub baz: u32,
+    }
+
+    impl Default for TestConfig {
+        fn default() -> Self {
+            Self {
+                foo: "foo".to_string(),
+                bar: true,
+                baz: 42,
+            }
+        }
+    }
+}
+
+#[cfg(feature = "toml")]
+#[cfg(test)]
+mod toml_tests {
+    use super::*;
+    use tempdir::TempDir;
+    use test_utils::TestConfig;
+
+    impl TOMLFile for TestConfig {}
+
+    #[test]
+    fn test_file_trait() {
+        let dir = TempDir::new("test_config").unwrap();
+        let config_file = dir.path().join("test-config.json");
+        let config = TestConfig::default();
+
+        // test write and load
+        config.write(&config_file).unwrap();
+        let loaded_config = TestConfig::load(&config_file).unwrap();
+        assert_eq!(config, loaded_config);
+    }
+}
+
+#[cfg(feature = "yaml")]
+#[cfg(test)]
+mod yaml_tests {
+    use super::*;
+    use tempdir::TempDir;
+    use test_utils::TestConfig;
+
+    impl YAMLFile for TestConfig {}
+
+    #[test]
+    fn test_file_trait() {
+        let dir = TempDir::new("test_config").unwrap();
+        let config_file = dir.path().join("test-config.json");
+        let config = TestConfig::default();
+
+        // test write and load
+        config.write(&config_file).unwrap();
+        let loaded_config = TestConfig::load(&config_file).unwrap();
+        assert_eq!(config, loaded_config);
+    }
+}
+
+#[cfg(feature = "json")]
+#[cfg(test)]
+mod json_tests {
+    use super::*;
+    use tempdir::TempDir;
+    use test_utils::TestConfig;
+
+    impl JSONFile for TestConfig {}
+
+    #[test]
+    fn test_file_trait() {
+        let dir = TempDir::new("test_config").unwrap();
+        let config_file = dir.path().join("test-config.json");
+        let config = TestConfig::default();
+
+        // test write and load
+        config.write(&config_file).unwrap();
+        let loaded_config = TestConfig::load(&config_file).unwrap();
+        assert_eq!(config, loaded_config);
     }
 }
